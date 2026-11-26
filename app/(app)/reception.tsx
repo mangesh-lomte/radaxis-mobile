@@ -19,6 +19,7 @@ import {
   useWaitingQueue,
 } from '@/src/hooks/useReception';
 import { receptionService } from '@/src/services/receptionService';
+import { getAppEnvironment, isMutationAllowed, MUTATION_GUARD_MESSAGE } from '@/src/constants/environment';
 import {
   ReadyReportItem,
   StaffAppointmentItem,
@@ -154,7 +155,14 @@ export default function ReceptionScreen() {
   const countCompleted = rawAppointments.filter((a) => a.status === 'COMPLETED' || a.imagingOrder?.orderStatus === 'COMPLETED').length;
   const countReadyReports = rawReports.length;
 
+  const canMutate = isMutationAllowed();
+  const isStaging = getAppEnvironment() === 'staging';
+
   const handleOpenCheckIn = (appt: StaffAppointmentItem) => {
+    if (!canMutate) {
+      Alert.alert('Read-Only Production View', MUTATION_GUARD_MESSAGE);
+      return;
+    }
     setCheckInTarget(appt);
     setVerifiedGovtId(false);
     setVerifiedWristband(false);
@@ -163,6 +171,10 @@ export default function ReceptionScreen() {
 
   const handleExecuteDemoCheckIn = async () => {
     if (!checkInTarget) return;
+    if (!canMutate) {
+      Alert.alert('Read-Only Production View', MUTATION_GUARD_MESSAGE);
+      return;
+    }
     if (!verifiedGovtId && !verifiedWristband) {
       Alert.alert(
         'Identity Verification Required',
@@ -178,14 +190,19 @@ export default function ReceptionScreen() {
         notes: verifiedGovtId ? 'Photo ID verified' : 'Wristband verified',
       });
 
+      if (!res.success) {
+        Alert.alert('Read-Only Production View', res.message);
+        return;
+      }
+
       setRecentCheckedInAppt(res.appointment);
       setCheckInTarget(null);
+      refetchQueue();
+      refetchAppts();
 
       Alert.alert(
-        res.isLocalDemonstration ? 'Preview Only' : 'Check-In Recorded',
-        res.isLocalDemonstration
-          ? 'Preview only — no changes saved.'
-          : `${res.message}\n\nAssigned Token: ${res.tokenNumber}\nPatient: ${checkInTarget.patient?.firstName} ${checkInTarget.patient?.lastName} (MRN: ${targetPatientId || 'N/A'})\nExam: ${checkInTarget.examination}`,
+        'Check-In Recorded',
+        `${res.message}\n\nAssigned Token: ${res.tokenNumber}\nPatient: ${checkInTarget.patient?.firstName} ${checkInTarget.patient?.lastName} (MRN: ${targetPatientId || 'N/A'})\nExam: ${checkInTarget.examination}`,
         [
           { text: 'View Queue', onPress: () => setActiveTab('QUEUE') },
           {
@@ -255,7 +272,7 @@ export default function ReceptionScreen() {
         <View style={{ width: 60 }} />
       </View>
 
-      {/* Date Switcher: Today vs Seeded Clinical Staging Dates */}
+      {/* Date Switcher */}
       <View style={styles.dateBar}>
         <Text style={styles.dateLabel}>Schedule:</Text>
         <TouchableOpacity
@@ -267,24 +284,28 @@ export default function ReceptionScreen() {
             Today
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.dateChip, selectedDate === '2026-11-21' && styles.dateChipActive]}
-          onPress={() => setSelectedDate('2026-11-21')}
-          activeOpacity={0.8}
-        >
-          <Text style={[styles.dateChipText, selectedDate === '2026-11-21' && styles.dateChipTextActive]}>
-            Nov 21
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.dateChip, selectedDate === '2026-11-22' && selectedDate !== todayDateStr && styles.dateChipActive]}
-          onPress={() => setSelectedDate('2026-11-22')}
-          activeOpacity={0.8}
-        >
-          <Text style={[styles.dateChipText, selectedDate === '2026-11-22' && styles.dateChipTextActive]}>
-            Nov 22
-          </Text>
-        </TouchableOpacity>
+        {isStaging && (
+          <>
+            <TouchableOpacity
+              style={[styles.dateChip, selectedDate === '2026-11-21' && styles.dateChipActive]}
+              onPress={() => setSelectedDate('2026-11-21')}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.dateChipText, selectedDate === '2026-11-21' && styles.dateChipTextActive]}>
+                Nov 21
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.dateChip, selectedDate === '2026-11-22' && selectedDate !== todayDateStr && styles.dateChipActive]}
+              onPress={() => setSelectedDate('2026-11-22')}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.dateChipText, selectedDate === '2026-11-22' && styles.dateChipTextActive]}>
+                Nov 22
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
       </View>
 
       {/* 4-Metric Strip */}
@@ -465,7 +486,7 @@ export default function ReceptionScreen() {
                 <Text style={styles.emptySub}>
                   No checked-in patients waiting for {selectedModality === 'ALL' ? 'any modality' : selectedModality} on {selectedDate}.
                 </Text>
-                {selectedDate !== '2026-11-21' && (
+                {isStaging && selectedDate !== '2026-11-21' && (
                   <TouchableOpacity
                     style={styles.switchDateBtn}
                     onPress={() => setSelectedDate('2026-11-21')}
@@ -544,7 +565,7 @@ export default function ReceptionScreen() {
                       <Text style={styles.locationTag}>{appt.equipment?.name || appt.location || 'Suite TBA'}</Text>
                     </View>
 
-                    {canCheckIn ? (
+                    {canCheckIn && canMutate ? (
                       <TouchableOpacity
                         style={styles.checkInActionBtn}
                         onPress={() => handleOpenCheckIn(appt)}
@@ -552,6 +573,12 @@ export default function ReceptionScreen() {
                       >
                         <Text style={styles.checkInActionBtnText}>Check In Patient (Issue Token) →</Text>
                       </TouchableOpacity>
+                    ) : canCheckIn && !canMutate ? (
+                      <View style={styles.checkedInRow}>
+                        <Text style={styles.checkedInRowText}>
+                          Read-only: Perform check-in on RIS Web Workstation
+                        </Text>
+                      </View>
                     ) : appt.status === 'CHECKED_IN' ? (
                       <View style={styles.checkedInRow}>
                         <Text style={styles.checkedInRowText}>
@@ -621,7 +648,7 @@ export default function ReceptionScreen() {
 
                   <View style={styles.footerRow}>
                     <Text style={styles.accessionTag}>ACC: {rep.accessionNumber}</Text>
-                    <Text style={styles.signedByText}>Signed: {rep.signedBy || 'Arthur Evans'}</Text>
+                    <Text style={styles.signedByText}>Signed: {rep.signedBy || 'Attending Radiologist'}</Text>
                   </View>
 
                   <View style={styles.handoverRow}>
@@ -790,7 +817,7 @@ export default function ReceptionScreen() {
                   </View>
                   <View style={styles.infoRow}>
                     <Text style={styles.infoLabel}>Reporting Radiologist:</Text>
-                    <Text style={styles.infoValueBold}>{selectedReport.signedBy || 'Arthur Evans'}</Text>
+                    <Text style={styles.infoValueBold}>{selectedReport.signedBy || 'Attending Radiologist'}</Text>
                   </View>
                   <View style={styles.infoRow}>
                     <Text style={styles.infoLabel}>Finalized Timestamp:</Text>

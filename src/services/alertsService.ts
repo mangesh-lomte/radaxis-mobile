@@ -1,9 +1,8 @@
 import { apiClient } from './api';
-import { isMutationAllowed } from '../constants/environment';
+import { isMutationAllowed, MUTATION_GUARD_MESSAGE } from '../constants/environment';
 import {
   CriticalFindingItem,
   CriticalFindingQueueResponse,
-  DEMO_CRITICAL_FINDINGS,
 } from '../types/alerts';
 
 export interface GetCriticalFindingsParams {
@@ -42,12 +41,6 @@ export const alertsService = {
    * Endpoint: GET /radiologist/critical-findings/:id
    */
   getCriticalFindingById: async (id: string): Promise<CriticalFindingItem> => {
-    // If it's a demo fixture, return from local fixtures
-    const demo = DEMO_CRITICAL_FINDINGS.find((f) => f.id === id);
-    if (demo) {
-      return demo;
-    }
-
     const endpoint = `/radiologist/critical-findings/${encodeURIComponent(id)}`;
     const res = await apiClient<CriticalFindingItem>(endpoint);
     return res.data;
@@ -55,20 +48,20 @@ export const alertsService = {
 
   /**
    * Acknowledge critical finding with readback confirmation.
-   * If in staging mode: dispatches POST to /radiologist/critical-findings/:id/acknowledge.
-   * If in production mode: safe local demo acknowledgment with zero database modification.
+   * Dispatches POST /radiologist/critical-findings/:id/acknowledge when allowed;
+   * blocked fail-closed in read-only production view.
    */
   acknowledgeFinding: async (
     finding: CriticalFindingItem,
     acknowledgedByName: string,
     readBackNotes?: string
-  ): Promise<{ finding: CriticalFindingItem; isLocalDemonstration: boolean; message: string }> => {
+  ): Promise<{ finding: CriticalFindingItem; success: boolean; isLocalDemonstration: boolean; message: string }> => {
     if (!isMutationAllowed()) {
-      const updated = alertsService.simulateAcknowledgeFinding(finding, acknowledgedByName, readBackNotes);
       return {
-        finding: updated,
-        isLocalDemonstration: true,
-        message: 'Preview only — no changes saved.',
+        finding,
+        success: false,
+        isLocalDemonstration: false,
+        message: MUTATION_GUARD_MESSAGE,
       };
     }
 
@@ -82,6 +75,7 @@ export const alertsService = {
 
     return {
       finding: res.data || alertsService.simulateAcknowledgeFinding(finding, acknowledgedByName, readBackNotes),
+      success: true,
       isLocalDemonstration: false,
       message: 'Critical finding acknowledgment recorded on server',
     };

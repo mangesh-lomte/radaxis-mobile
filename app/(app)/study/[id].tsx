@@ -127,9 +127,9 @@ export default function StudyDetailScreen() {
   const demo = formatDemographics(patient.dateOfBirth, patient.gender);
   const dobFormatted = patient.dateOfBirth ? patient.dateOfBirth.slice(0, 10) : 'Not recorded';
   const location = [patient.city, patient.state].filter(Boolean).join(', ') || 'Outpatient Facility';
-  const referringDoctor = order.referringDoctor?.name || 'Staff Radiologist';
+  const referringDoctor = order.referringDoctor?.name || 'Internal Staff';
   const referringDept = order.referringDoctor?.organization || 'Hospital Staff';
-  const contactPhone = order.referringDoctor?.phone || 'Speed-dial 2341';
+  const contactPhone = order.referringDoctor?.phone || '';
 
   const initials = fullName
     .split(' ')
@@ -138,7 +138,39 @@ export default function StudyDetailScreen() {
     .join('')
     .toUpperCase() || 'PT';
 
-  const finalizedReport = reportData?.finalizedReport;
+  const orderFinalReport =
+    order.report && (order.report.status === 'FINAL' || order.report.reportStatus === 'FINAL')
+      ? {
+          id: order.report.id,
+          status: order.report.status || order.report.reportStatus || 'FINAL',
+          version: order.report.version || 1,
+          findings: order.report.findings || '',
+          impression: order.report.impression || '',
+          finalizedAt: order.report.finalizedAt,
+          signedAt: order.report.signedAt,
+          radiologist: order.report.radiologist
+            ? {
+                id: order.report.radiologist.id || '',
+                name:
+                  order.report.radiologist.name ||
+                  `${order.report.radiologist.firstName || ''} ${order.report.radiologist.lastName || ''}`.trim() ||
+                  order.report.digitalSignature?.signedBy ||
+                  'Attending Radiologist',
+                email: order.report.radiologist.email || '',
+              }
+            : order.report.digitalSignature?.signedBy
+            ? { id: '', name: order.report.digitalSignature.signedBy, email: '' }
+            : null,
+          signedBy: order.report.digitalSignature?.signedBy
+            ? { id: '', name: order.report.digitalSignature.signedBy, email: '', role: 'RADIOLOGIST' }
+            : null,
+          signatureHash: order.report.signatureHash || order.report.digitalSignature?.signatureHash,
+          pdfFileSizeBytes: order.report.pdfFileSizeBytes,
+          pdfGeneratedAt: order.report.pdfGeneratedAt,
+        }
+      : null;
+
+  const finalizedReport = reportData?.finalizedReport || orderFinalReport;
   const draftReport = reportData?.draft;
   const hasReport = !!finalizedReport || !!draftReport;
 
@@ -225,7 +257,7 @@ export default function StudyDetailScreen() {
       const finalizedDate = finalizedReport?.finalizedAt
         ? formatDate(finalizedReport.finalizedAt, { format: 'datetime' })
         : 'Verified';
-      const signer = finalizedReport?.radiologist?.name || finalizedReport?.signedBy?.name || 'Dr. Arthur Evans';
+      const signer = finalizedReport?.radiologist?.name || finalizedReport?.signedBy?.name || 'Attending Radiologist';
       const signatureHash = finalizedReport?.signatureHash;
 
       Alert.alert(
@@ -454,7 +486,7 @@ export default function StudyDetailScreen() {
                   <View style={styles.sigTextGroup}>
                     <Text style={styles.sigTitle}>Digitally Signed & Locked</Text>
                     <Text style={styles.sigAuthor}>
-                      Dr. {finalizedReport.radiologist?.name || 'Arthur Evans'} ·{' '}
+                      {finalizedReport.radiologist?.name || finalizedReport.signedBy?.name || 'Attending Radiologist'} ·{' '}
                       {finalizedReport.finalizedAt ? finalizedReport.finalizedAt.slice(0, 16).replace('T', ' ') : 'Verified'}
                     </Text>
                   </View>

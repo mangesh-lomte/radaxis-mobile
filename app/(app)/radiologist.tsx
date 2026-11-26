@@ -20,6 +20,7 @@ import {
   useReportingTemplates,
 } from '@/src/hooks/useClinical';
 import { radiologistService } from '@/src/services/clinicalService';
+import { isMutationAllowed, MUTATION_GUARD_MESSAGE } from '@/src/constants/environment';
 import {
   FinalizedReportSummary,
   RadiologistWorklistItem,
@@ -97,47 +98,48 @@ export default function RadiologistScreen() {
     }
   };
 
+  const canMutate = isMutationAllowed();
+
   const handleOpenWorkspace = (study: RadiologistWorklistItem) => {
     setSelectedStudy(study);
-    // Find matching template for study modality
-    const matchingTemplate = rawTemplates.find((t) => t.modality === study.modality) || rawTemplates[0];
-    if (matchingTemplate) {
-      setSelectedTemplate(matchingTemplate);
-      setFindingsText(
-        `EXAMINATION: ${study.procedureName}\nCLINICAL INDICATION: ${study.clinicalIndication || 'None'}\n\nFINDINGS:\n- Lungs and pleural spaces: Clear without acute focal consolidation.\n- Mediastinum and hila: Normal contour, no lymphadenopathy.\n- Visualized osseous structures: Unremarkable.`
-      );
-      setImpressionText(
-        `IMPRESSION:\n1. No acute cardiopulmonary abnormality.\n2. Negative for pulmonary embolism or acute vascular compromise.`
-      );
-    }
+    const matchingTemplate = rawTemplates.find((t) => t.modality === study.modality) || rawTemplates[0] || null;
+    setSelectedTemplate(matchingTemplate);
+    setFindingsText('');
+    setImpressionText('');
   };
 
   const handleSelectTemplate = (template: ReportingTemplateItem) => {
     setSelectedTemplate(template);
-    setFindingsText(
-      `TEMPLATE: ${template.name}\n\nFINDINGS:\n- Organ systems evaluated according to ${template.name} protocol.\n- No significant mass lesion, acute hemorrhage, or pathological enhancement.`
-    );
-    setImpressionText(
-      `IMPRESSION:\n1. Routine ${template.modality} examination within normal physiological limits.`
-    );
+    const sectionStub = (template.sections || ['FINDINGS', 'IMPRESSION'])
+      .map((s) => `${s}:\n`)
+      .join('\n');
+    setFindingsText(sectionStub);
+    setImpressionText('');
   };
 
   const handleToggleClaim = async (orderId: string) => {
+    if (!canMutate) {
+      Alert.alert('Read-Only Production View', MUTATION_GUARD_MESSAGE);
+      return;
+    }
     const nextClaimed = !claimedStudies[orderId];
     try {
       const res = nextClaimed
         ? await radiologistService.claimStudy(orderId)
         : await radiologistService.releaseStudy(orderId);
 
+      if (!res.success) {
+        Alert.alert('Read-Only Production View', res.message);
+        return;
+      }
+
       setClaimedStudies((prev) => ({ ...prev, [orderId]: nextClaimed }));
 
       Alert.alert(
-        res.isLocalDemonstration ? 'Preview Only' : (nextClaimed ? 'Study Claimed' : 'Study Released'),
-        res.isLocalDemonstration
-          ? 'Preview only — no changes saved.'
-          : (nextClaimed
-            ? `Study ${selectedStudy?.accessionNumber} claimed successfully.`
-            : `Study ${selectedStudy?.accessionNumber} released successfully.`),
+        nextClaimed ? 'Study Claimed' : 'Study Released',
+        nextClaimed
+          ? `Study ${selectedStudy?.accessionNumber} claimed successfully.`
+          : `Study ${selectedStudy?.accessionNumber} released successfully.`,
         [{ text: 'OK' }]
       );
     } catch (err: any) {
@@ -147,17 +149,26 @@ export default function RadiologistScreen() {
 
   const handleSimulateSigning = async () => {
     if (!selectedStudy) return;
+    if (!canMutate) {
+      Alert.alert('Read-Only Production View', MUTATION_GUARD_MESSAGE);
+      return;
+    }
     try {
       const res = await radiologistService.finalizeAndSignReport(selectedStudy.imagingOrderId, {
         findings: findingsText,
         impression: impressionText,
       });
 
+      if (!res.success) {
+        Alert.alert('Read-Only Production View', res.message);
+        return;
+      }
+
+      refetchWorklist();
+      refetchFinalized();
       Alert.alert(
-        res.isLocalDemonstration ? 'Preview Only' : 'Report Finalized & Signed',
-        res.isLocalDemonstration
-          ? 'Preview only — no changes saved.'
-          : (res.message || 'Diagnostic report has been electronically finalized and signed.'),
+        'Report Finalized & Signed',
+        res.message || 'Diagnostic report has been electronically finalized and signed.',
         [{ text: 'Close', onPress: () => setSelectedStudy(null) }]
       );
     } catch (err: any) {
@@ -478,18 +489,20 @@ export default function RadiologistScreen() {
                         MRN: {selectedStudy.patientId} • {selectedStudy.procedureName}
                       </Text>
                     </View>
-                    <TouchableOpacity
-                      style={[
-                        styles.claimBtn,
-                        claimedStudies[selectedStudy.imagingOrderId || ''] && styles.claimedBtnActive,
-                      ]}
-                      onPress={() => handleToggleClaim(selectedStudy.imagingOrderId)}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={styles.claimBtnText}>
-                        {claimedStudies[selectedStudy.imagingOrderId || ''] ? 'Release' : 'Claim'}
-                      </Text>
-                    </TouchableOpacity>
+                    {canMutate && (
+                      <TouchableOpacity
+                        style={[
+                          styles.claimBtn,
+                          claimedStudies[selectedStudy.imagingOrderId || ''] && styles.claimedBtnActive,
+                        ]}
+                        onPress={() => handleToggleClaim(selectedStudy.imagingOrderId)}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={styles.claimBtnText}>
+                          {claimedStudies[selectedStudy.imagingOrderId || ''] ? 'Release' : 'Claim'}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
 
                   {/* Direct OHIF Viewer Launcher */}
@@ -506,29 +519,38 @@ export default function RadiologistScreen() {
 
                 {/* Template Picker */}
                 <Text style={styles.sectionHeaderTitle}>STRUCTURED REPORT TEMPLATES</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.templateScroll}>
-                  {rawTemplates.map((t) => (
-                    <TouchableOpacity
-                      key={t.id}
-                      style={[
-                        styles.templateChip,
-                        selectedTemplate?.id === t.id && styles.templateChipActive,
-                      ]}
-                      onPress={() => handleSelectTemplate(t)}
-                    >
-                      <Text style={[styles.templateChipText, selectedTemplate?.id === t.id && styles.templateChipTextActive]}>
-                        {t.name}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
+                {rawTemplates.length > 0 ? (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.templateScroll}>
+                    {rawTemplates.map((t) => (
+                      <TouchableOpacity
+                        key={t.id}
+                        style={[
+                          styles.templateChip,
+                          selectedTemplate?.id === t.id && styles.templateChipActive,
+                        ]}
+                        onPress={() => handleSelectTemplate(t)}
+                      >
+                        <Text style={[styles.templateChipText, selectedTemplate?.id === t.id && styles.templateChipTextActive]}>
+                          {t.name}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                ) : (
+                  <Text style={[styles.patientMeta, { marginBottom: 12 }]}>
+                    Structured templates catalog requires ADMIN permission or RIS Web Workstation access.
+                  </Text>
+                )}
 
                 {/* Live Report Editor */}
-                <Text style={styles.sectionHeaderTitle}>FINDINGS (EDITABLE DRAFT)</Text>
+                <Text style={styles.sectionHeaderTitle}>FINDINGS {canMutate ? '(EDITABLE DRAFT)' : '(READ-ONLY VIEW)'}</Text>
                 <TextInput
                   style={styles.reportTextInput}
                   value={findingsText}
                   onChangeText={setFindingsText}
+                  editable={canMutate}
+                  placeholder={canMutate ? 'Enter diagnostic findings...' : 'Report authoring restricted to RIS Web Workstation'}
+                  placeholderTextColor="#94A3B8"
                   multiline
                   numberOfLines={6}
                   textAlignVertical="top"
@@ -539,6 +561,9 @@ export default function RadiologistScreen() {
                   style={[styles.reportTextInput, { minHeight: 80 }]}
                   value={impressionText}
                   onChangeText={setImpressionText}
+                  editable={canMutate}
+                  placeholder={canMutate ? 'Enter diagnostic impression...' : 'Read-only view in production mobile'}
+                  placeholderTextColor="#94A3B8"
                   multiline
                   numberOfLines={4}
                   textAlignVertical="top"
@@ -551,26 +576,36 @@ export default function RadiologistScreen() {
                     "Electronically reviewed, approved, and authorized for clinical record."
                   </Text>
                   <View style={styles.sigMetaRow}>
-                    <Text style={styles.sigSigner}>Signer: Dr. Arthur Evans (Radiologist)</Text>
-                    <Text style={styles.sigAlg}>Status: Verified & Ready to Sign</Text>
+                    <Text style={styles.sigSigner}>
+                      Signer: {user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email : 'Clinician'} ({user?.role || 'RADIOLOGIST'})
+                    </Text>
+                    <Text style={styles.sigAlg}>
+                      Status: {canMutate ? 'Ready to Sign' : 'Read-Only'}
+                    </Text>
                   </View>
                 </View>
 
-                {/* Simulation Safety Warning */}
+                {/* Safety Notice */}
                 <View style={styles.simNoticeBox}>
-                  <Text style={styles.simNoticeTitle}>REPORT FINALIZATION NOTICE</Text>
+                  <Text style={styles.simNoticeTitle}>
+                    {canMutate ? 'REPORT FINALIZATION NOTICE' : 'READ-ONLY PRODUCTION POLICY'}
+                  </Text>
                   <Text style={styles.simNoticeText}>
-                    Electronically signs the diagnostic findings and advances the order status to COMPLETED on the RIS server.
+                    {canMutate
+                      ? 'Electronically signs the diagnostic findings and advances the order status to COMPLETED on the RIS server.'
+                      : 'Diagnostic report authoring, claiming, and digital signing are performed on the authorized RIS Web Workstation.'}
                   </Text>
                 </View>
 
-                <TouchableOpacity
-                  style={styles.signReportBtn}
-                  onPress={handleSimulateSigning}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.signReportBtnText}>Sign & Finalize Diagnostic Report →</Text>
-                </TouchableOpacity>
+                {canMutate && (
+                  <TouchableOpacity
+                    style={styles.signReportBtn}
+                    onPress={handleSimulateSigning}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.signReportBtnText}>Sign & Finalize Diagnostic Report →</Text>
+                  </TouchableOpacity>
+                )}
               </ScrollView>
             </View>
           </View>
@@ -610,7 +645,7 @@ export default function RadiologistScreen() {
                   <View style={styles.sigBox}>
                     <Text style={styles.sigTitle}>DIGITAL SIGNATURE MANIFEST</Text>
                     <Text style={styles.sigSigner}>
-                      Signed by: {selectedFinalizedReport.digitalSignature?.signedBy || 'Arthur Evans'}
+                      Signed by: {selectedFinalizedReport.digitalSignature?.signedBy || (selectedFinalizedReport.radiologist ? `${selectedFinalizedReport.radiologist.firstName} ${selectedFinalizedReport.radiologist.lastName}`.trim() : 'Attending Radiologist')}
                     </Text>
                     <Text style={styles.sigStatement}>
                       {selectedFinalizedReport.digitalSignature?.statement}

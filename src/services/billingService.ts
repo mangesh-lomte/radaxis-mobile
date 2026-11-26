@@ -4,7 +4,7 @@
  */
 
 import { apiClient } from './api';
-import { isMutationAllowed, DEMO_IDENTIFIER_PREFIX } from '../constants/environment';
+import { isMutationAllowed, MUTATION_GUARD_MESSAGE } from '../constants/environment';
 import { InvoiceDetail, InvoiceListItem, ReceiptRecord } from '../types/billing';
 import { safeNumber } from '../utils/formatters';
 
@@ -127,8 +127,8 @@ export const billingService = {
 
   /**
    * Record payment against invoice.
-   * If in staging mode: dispatches POST to /billing/invoices/:id/payments.
-   * If in production mode: safe local demo simulation with distinct DEMO-LOCAL prefix and zero server mutation.
+   * Dispatches POST to /billing/invoices/:id/payments when allowed;
+   * blocked fail-closed in read-only production view.
    */
   recordPayment: async (
     invoiceId: string,
@@ -139,29 +139,17 @@ export const billingService = {
       notes?: string;
     }
   ): Promise<{
-    receipt: ReceiptRecord;
+    receipt: ReceiptRecord | null;
+    success: boolean;
     isLocalDemonstration: boolean;
     message: string;
   }> => {
     if (!isMutationAllowed()) {
-      const demoReceipt: ReceiptRecord = {
-        id: `rcp-demo-${Date.now()}`,
-        receiptNumber: `${DEMO_IDENTIFIER_PREFIX}RCP-${Math.floor(1000 + Math.random() * 9000)}`,
-        invoiceNumber: invoiceId,
-        patientId: 'PAT-DEMO-001',
-        patientName: 'Demo Patient',
-        accessionNumber: 'ACC-DEMO-001',
-        amount: input.amount,
-        paymentMethod: input.paymentMethod,
-        reference: input.reference || 'DEMO-LOCAL-REF',
-        issuedAt: new Date().toISOString(),
-        isDemoReceipt: true,
-      };
-
       return {
-        receipt: demoReceipt,
-        isLocalDemonstration: true,
-        message: 'Preview only — no changes saved.',
+        receipt: null,
+        success: false,
+        isLocalDemonstration: false,
+        message: MUTATION_GUARD_MESSAGE,
       };
     }
 
@@ -173,6 +161,7 @@ export const billingService = {
 
     return {
       receipt: normalizeReceipt(res.data),
+      success: true,
       isLocalDemonstration: false,
       message: 'Payment recorded and official receipt generated',
     };

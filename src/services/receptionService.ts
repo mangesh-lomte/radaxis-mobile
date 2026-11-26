@@ -5,7 +5,7 @@
  */
 
 import { apiClient } from './api';
-import { isMutationAllowed } from '../constants/environment';
+import { isMutationAllowed, MUTATION_GUARD_MESSAGE } from '../constants/environment';
 import {
   AppointmentListParams,
   PaginatedAppointmentsResponse,
@@ -130,7 +130,7 @@ export const receptionService = {
   },
 
   /**
-   * Check in patient: dispatches to staging API when allowed, or executes safe demo check-in when in production mode
+   * Check in patient: dispatches to staging API when allowed, or returns fail-closed guard notice in production
    */
   checkInPatient: async (
     appointment: StaffAppointmentItem,
@@ -139,17 +139,18 @@ export const receptionService = {
     appointment: StaffAppointmentItem;
     tokenNumber: string;
     checkedInAt: string;
+    success: boolean;
     isLocalDemonstration: boolean;
     message: string;
   }> => {
     if (!isMutationAllowed()) {
-      const demo = receptionService.simulateCheckIn(appointment);
       return {
-        appointment: demo.updatedAppointment,
-        tokenNumber: demo.tokenNumber,
-        checkedInAt: demo.checkedInAt,
-        isLocalDemonstration: true,
-        message: 'Preview only — no changes saved.',
+        appointment,
+        tokenNumber: '',
+        checkedInAt: '',
+        success: false,
+        isLocalDemonstration: false,
+        message: MUTATION_GUARD_MESSAGE,
       };
     }
 
@@ -167,13 +168,14 @@ export const receptionService = {
       appointment: updated,
       tokenNumber: updated.tokenNumber || `TKN-${Math.floor(100 + Math.random() * 900)}`,
       checkedInAt: updated.checkedInAt || new Date().toISOString(),
+      success: true,
       isLocalDemonstration: false,
       message: 'Patient check-in recorded on server',
     };
   },
 
   /**
-   * Allocate scanner machine: dispatches to staging or executes safe demo allocation
+   * Allocate scanner machine: dispatches when allowed, blocked fail-closed in production
    */
   allocateScanner: async (
     appointmentId: string,
@@ -181,9 +183,9 @@ export const receptionService = {
   ): Promise<{ success: boolean; isLocalDemonstration: boolean; message: string }> => {
     if (!isMutationAllowed()) {
       return {
-        success: true,
-        isLocalDemonstration: true,
-        message: 'Demo Mode: Scanner allocation simulated (Production Protected)',
+        success: false,
+        isLocalDemonstration: false,
+        message: MUTATION_GUARD_MESSAGE,
       };
     }
 
@@ -201,7 +203,7 @@ export const receptionService = {
   },
 
   /**
-   * Handover diagnostic report to patient
+   * Handover diagnostic report to patient: dispatches when allowed, blocked fail-closed in production
    */
   handoverReport: async (
     reportId: string,
@@ -209,9 +211,9 @@ export const receptionService = {
   ): Promise<{ success: boolean; isLocalDemonstration: boolean; message: string }> => {
     if (!isMutationAllowed()) {
       return {
-        success: true,
-        isLocalDemonstration: true,
-        message: 'Demo Mode: Report handover recorded locally (Production Protected)',
+        success: false,
+        isLocalDemonstration: false,
+        message: MUTATION_GUARD_MESSAGE,
       };
     }
 

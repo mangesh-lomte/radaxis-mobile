@@ -25,8 +25,9 @@ export const reportService = {
       return res.data;
     } catch (err: unknown) {
       if (err instanceof ApiError) {
-        // 404 = report not found; 409 = order not yet eligible for reporting (e.g. scanning pending)
-        if (err.statusCode === 404 || err.statusCode === 409) {
+        // 403 = draft belongs to another radiologist or role lacks report-workspace access;
+        // 404 = report not found; 409 = order not yet eligible for reporting
+        if (err.statusCode === 403 || err.statusCode === 404 || err.statusCode === 409) {
           return null;
         }
       }

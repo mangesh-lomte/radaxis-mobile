@@ -110,7 +110,7 @@ RadAxis Mobile connects directly to the existing RadAxis RIS server over HTTPS. 
 - **Authentication**: JWT tokens issued via `POST /api/v1/auth/login` (clinical staff) and `POST /api/v1/portal/patient/verify-otp` (patients).
 - **Session Isolation**: Staff tokens are keyed to `radaxis_auth_token`, while patient portal sessions use `radaxis_patient_auth_token`. Separate route groups (`app/(app)/*` vs `app/(patient)/*`) prevent privilege escalation.
 - **Timeout Management**: Network requests utilize native `AbortController` with a configurable 15-second timeout window.
-- **Production Guard Policy**: To prevent accidental data corruption or unverified writes during demonstration usage, a client-side mutation engine enforces read-only safety when connected to the live production host (`meril-ris.mangesh.my.id`). Non-persisted operations truthfully report *"Preview only — no changes saved."*
+- **Production Guard Policy**: When targeting the live production host (`meril-ris.mangesh.my.id`), authorized patient self-service endpoints (`/portal/patient/book`, `/portal/patient/appointments/:id/reschedule`, `/portal/patient/appointments/:id/cancel`) dispatch genuine authenticated requests, while clinical staff write operations (scan transitions, report signing, billing payments, front-desk check-in, critical alert acknowledgments, share revocation) remain fail-closed read-only and disabled in the UI until a dedicated mobile authorization review is completed.
 
 ---
 
@@ -333,9 +333,10 @@ npx eas-cli build --platform android --profile preview-staging
 
 ## 15. Current Limitations
 
-- **SMS Delivery Gateway**: Public patient self-registration and dynamic OTP delivery currently rely on clinic demonstration mode or local evaluation numbers until a commercial SMS provider (e.g., Twilio or AWS SNS) is provisioned on the backend gateway.
+- **Patient OTP Authentication Blocker**: The production backend `POST /api/v1/portal/patient/request-otp` endpoint is currently blocked for unrestricted public launch until a commercial SMS provider (e.g., Twilio or AWS SNS) is configured on the backend gateway; patient self-service OTP remains restricted pending SMS integration and backend hardening.
+- **Radiology Reporting Templates RBAC**: `GET /api/v1/admin/reporting-templates` is currently restricted to `ADMIN` accounts on the backend; `RADIOLOGIST` accounts receive HTTP 403 until a read-only radiologist templates route is exposed.
+- **Read-Only Staff Workflows in Production**: Clinical staff mutations (front-desk check-in, scan acquisition lifecycle, diagnostic report signing, payment collection, alert acknowledgment, and external share revocation) are disabled in production mobile builds and remain exclusively on the RIS Web Workstation.
 - **Offline DICOM Caching**: Large multi-frame CT and MRI DICOM studies require an active network connection to stream from the Orthanc PACS server; local offline DICOM caching is not currently supported.
-- **Production Write Restrictions**: Under production preview configurations, write operations on financial transactions and finalized reports are blocked client-side to prevent tampering with live clinical data.
 - **Platform Scope**: The current release focuses on Android tablet and phone form factors; iOS builds require provisioning certificates under an active Apple Developer Program account.
 
 ---

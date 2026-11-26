@@ -20,7 +20,7 @@ export const API_BASE_URL: string = (() => {
 export const APP_CONFIG = {
   appName: 'RadAxis Mobile',
   appSubtitle: 'Enterprise Radiology Information System',
-  version: '1.0.0',
+  version: '1.0.5',
   tokenKey: isStaging ? 'radaxis_staging_auth_token' : 'radaxis_auth_token',
   userKey: isStaging ? 'radaxis_staging_auth_user' : 'radaxis_auth_user',
   requestTimeoutMs: 15000,

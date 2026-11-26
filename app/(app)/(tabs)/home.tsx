@@ -23,7 +23,7 @@ import { Colors } from '@/src/theme/colors';
 export default function HomeScreen() {
   const { user } = useAuth();
   const router = useRouter();
-  const { data: dashboardData, isLoading, refetch, isRefetching } = useDashboardOverview();
+  const { data: dashboardData, isLoading, isError: isDashboardError, refetch, isRefetching } = useDashboardOverview();
   const { data: worklistData, refetch: refetchWorklist, isRefetching: isWorklistRefetching } = useWorklist({ pageSize: 10 });
 
   const liveOrders = worklistData?.items || [];
@@ -31,18 +31,18 @@ export default function HomeScreen() {
 
   // Dynamic metrics derived from authorized RIS backend overview
   const overview = {
-    totalBookings: dashboardData?.todayOverview?.totalBookings ?? liveOrders.length,
+    totalBookings: dashboardData?.todayOverview?.totalBookings ?? 0,
     pendingReports: dashboardData?.todayOverview?.pendingReports ?? 0,
     completedScans: dashboardData?.todayOverview?.completedScans ?? 0,
     finalizedReportsToday: dashboardData?.todayOverview?.finalizedReportsToday ?? 0,
   };
 
   const pipelineFlow = {
-    booked: dashboardData?.livePatientStatus?.breakdown?.booked ?? overview.totalBookings,
+    booked: dashboardData?.livePatientStatus?.breakdown?.booked ?? 0,
     arrived: dashboardData?.livePatientStatus?.breakdown?.arrived ?? 0,
     scanning: dashboardData?.livePatientStatus?.breakdown?.scanning ?? 0,
-    pacsReady: dashboardData?.livePatientStatus?.breakdown?.delivered ?? overview.completedScans,
-    reporting: dashboardData?.livePatientStatus?.breakdown?.reporting ?? overview.pendingReports,
+    pacsReady: dashboardData?.livePatientStatus?.breakdown?.delivered ?? 0,
+    reporting: dashboardData?.livePatientStatus?.breakdown?.reporting ?? 0,
   };
 
   const primaryStatStudy = liveStatOrder
@@ -60,10 +60,9 @@ export default function HomeScreen() {
   );
   const displayLiveOrders = sortedLiveOrders.slice(0, 3);
 
-  const roleName = user?.role || 'RADIOLOGIST';
-  const clinicianName = user
-    ? `Dr. ${user.firstName || user.email.split('@')[0]}`
-    : 'Dr. Clinician';
+  const roleName = user?.role || 'STAFF';
+  const displayFirstName = user?.firstName || user?.email.split('@')[0] || 'Clinician';
+  const clinicianName = roleName === 'RADIOLOGIST' ? `Dr. ${displayFirstName}` : displayFirstName;
 
   const handleRefresh = () => {
     refetch();
@@ -371,40 +370,44 @@ export default function HomeScreen() {
           </ScrollView>
         </View>
 
-        {/* Scanner Fleet Quick Status */}
+        {/* Scanner Fleet Quick Status (live from /dashboard/overview modalityTiles) */}
         <SectionHeader title="Modality Scanner Fleets" />
         <View style={styles.fleetCard}>
-          <View style={styles.fleetRow}>
-            <View style={styles.fleetModalityPill}>
-              <Text style={styles.fleetModalityText}>CT</Text>
-            </View>
-            <View style={styles.fleetInfo}>
-              <Text style={styles.fleetName}>Siemens Somatom Force (Bay 2)</Text>
-              <Text style={styles.fleetStatus}>Acquiring Contrast Study • Active Clinical Fleet</Text>
-            </View>
-            <View style={styles.fleetBadgeActive}>
-              <Text style={styles.fleetBadgeTextActive}>OPERATIONAL</Text>
-            </View>
-          </View>
-
-          <View style={styles.fleetDivider} />
-
-          <View style={styles.fleetRow}>
-            <View style={[styles.fleetModalityPill, styles.fleetModalityMri]}>
-              <Text style={[styles.fleetModalityText, styles.fleetTextMri]}>MRI</Text>
-            </View>
-            <View style={styles.fleetInfo}>
-              <Text style={styles.fleetName}>Siemens Vida 3T (Suite B)</Text>
-              <Text style={styles.fleetStatus}>
-                {liveOrders.find((o) => o.modality === 'MRI')
-                  ? `Patient In Prep • Next: ${liveOrders.find((o) => o.modality === 'MRI')?.accessionNumber}`
-                  : 'Diagnostic Suite Ready • Calibration Verified'}
-              </Text>
-            </View>
-            <View style={styles.fleetBadgeReady}>
-              <Text style={styles.fleetBadgeTextReady}>READY</Text>
-            </View>
-          </View>
+          {dashboardData?.modalityTiles && dashboardData.modalityTiles.length > 0 ? (
+            dashboardData.modalityTiles.map((tile, idx) => {
+              const isMri = tile.modality === 'MRI';
+              const isOperational = tile.status === 'OPERATIONAL';
+              return (
+                <React.Fragment key={tile.modality}>
+                  {idx > 0 && <View style={styles.fleetDivider} />}
+                  <View style={styles.fleetRow}>
+                    <View style={[styles.fleetModalityPill, isMri && styles.fleetModalityMri]}>
+                      <Text style={[styles.fleetModalityText, isMri && styles.fleetTextMri]}>
+                        {tile.modality}
+                      </Text>
+                    </View>
+                    <View style={styles.fleetInfo}>
+                      <Text style={styles.fleetName}>{tile.name}</Text>
+                      <Text style={styles.fleetStatus}>
+                        {tile.operationalScanners}/{tile.totalScanners} Scanners Online • {tile.todayScheduledCount} Scheduled Today
+                      </Text>
+                    </View>
+                    <View style={isOperational ? styles.fleetBadgeActive : styles.fleetBadgeReady}>
+                      <Text style={isOperational ? styles.fleetBadgeTextActive : styles.fleetBadgeTextReady}>
+                        {tile.status}
+                      </Text>
+                    </View>
+                  </View>
+                </React.Fragment>
+              );
+            })
+          ) : (
+            <Text style={[styles.stepLabel, { textAlign: 'center', marginVertical: 10 }]}>
+              {isDashboardError
+                ? 'Unable to load modality fleet status from RIS server.'
+                : 'Loading live modality status from RIS server...'}
+            </Text>
+          )}
         </View>
 
         {/* Priority Clinical Worklist Items */}

@@ -1,5 +1,5 @@
 import { apiClient } from './api';
-import { isMutationAllowed } from '../constants/environment';
+import { isMutationAllowed, MUTATION_GUARD_MESSAGE } from '../constants/environment';
 import {
   AuditLogItem,
   EquipmentAsset,
@@ -132,21 +132,13 @@ export const operationsService = {
     studyId: string,
     recipientEmail?: string,
     recipientName?: string
-  ): Promise<{ share: Partial<ExternalShareItem>; isLocalDemonstration: boolean; message: string }> => {
+  ): Promise<{ share: Partial<ExternalShareItem> | null; success: boolean; isLocalDemonstration: boolean; message: string }> => {
     if (!isMutationAllowed()) {
-      const demoShare: Partial<ExternalShareItem> = {
-        id: `share-demo-${Date.now()}`,
-        shareNumber: 'SHR-DEMO-001',
-        shareToken: 'DEMO-SHARE-99',
-        recipientEmail: recipientEmail || 'referring.physician@hospital.org',
-        status: 'ACTIVE',
-        createdAt: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + 86400000 * 7).toISOString(),
-      };
       return {
-        share: demoShare,
-        isLocalDemonstration: true,
-        message: 'Preview only — no changes saved.',
+        share: null,
+        success: false,
+        isLocalDemonstration: false,
+        message: MUTATION_GUARD_MESSAGE,
       };
     }
 
@@ -164,6 +156,7 @@ export const operationsService = {
 
     return {
       share: res.data,
+      success: true,
       isLocalDemonstration: false,
       message: 'External PACS access link generated',
     };
@@ -174,9 +167,9 @@ export const operationsService = {
   ): Promise<{ success: boolean; isLocalDemonstration: boolean; message: string }> => {
     if (!isMutationAllowed()) {
       return {
-        success: true,
-        isLocalDemonstration: true,
-        message: 'Preview only — no changes saved.',
+        success: false,
+        isLocalDemonstration: false,
+        message: MUTATION_GUARD_MESSAGE,
       };
     }
 

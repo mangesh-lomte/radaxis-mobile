@@ -8,7 +8,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "test": "npx tsx --test __tests__/demographics.test.ts __tests__/runtimeSafety.test.ts __tests__/securityIsolation.test.ts",
+    "test": "npx tsx --test __tests__/demographics.test.ts __tests__/runtimeSafety.test.ts __tests__/securityIsolation.test.ts __tests__/productionPreviewAudit.test.ts __tests__/receptionWorklistPacs.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

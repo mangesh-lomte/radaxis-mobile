@@ -14,6 +14,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router';
 import { useExternalShares } from '@/src/hooks/useOperations';
 import { operationsService } from '@/src/services/operationsService';
+import { isMutationAllowed, MUTATION_GUARD_MESSAGE } from '@/src/constants/environment';
 import { ExternalShareItem } from '@/src/types/operations';
 import { ModuleIcon } from '@/src/components/ui/ModuleIcon';
 
@@ -348,19 +349,22 @@ export default function ExternalSharesScreen() {
               </ScrollView>
 
               <View style={[styles.modalFooter, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-                {selectedShare.status === 'ACTIVE' && (
+                {selectedShare.status === 'ACTIVE' && isMutationAllowed() && (
                   <TouchableOpacity
                     style={[styles.modalDismissBtn, { backgroundColor: '#FEF2F2', borderColor: '#FECACA', borderWidth: 1, marginBottom: 8 }]}
                     onPress={async () => {
                       try {
                         const res = await operationsService.revokeExternalShare(selectedShare.id);
+                        if (!res.success) {
+                          Alert.alert('Read-Only Production View', res.message || MUTATION_GUARD_MESSAGE);
+                          return;
+                        }
                         Alert.alert(
-                          res.isLocalDemonstration ? 'Preview Only' : 'Share Revoked',
-                          res.isLocalDemonstration
-                            ? 'Preview only — no changes saved.'
-                            : (res.message || 'External access link revoked successfully.')
+                          'Share Revoked',
+                          res.message || 'External access link revoked successfully.'
                         );
                         setSelectedShare((prev) => (prev ? { ...prev, status: 'REVOKED' } : null));
+                        refetch();
                       } catch (err: any) {
                         Alert.alert('Error', err?.message || 'Could not revoke share.');
                       }

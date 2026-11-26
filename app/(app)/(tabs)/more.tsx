@@ -30,14 +30,6 @@ const ROLE_BADGE_STYLE: Record<UserRole, { bg: string; text: string; border: str
   ENGINEER: { bg: '#F1F5F9', text: '#475569', border: '#CBD5E1' },
 };
 
-const PREVIEW_USER = {
-  id: 'USR-PREVIEW-01',
-  email: 'admin@ris.local',
-  firstName: 'Arthur',
-  lastName: 'Evans',
-  role: 'ADMIN' as UserRole,
-};
-
 export default function MoreScreen() {
   const { user, logout } = useAuth();
   const router = useRouter();
@@ -46,12 +38,15 @@ export default function MoreScreen() {
   const insets = useSafeAreaInsets();
   const isProduction = isProductionHost(API_BASE_URL);
 
-  const currentUser = user || PREVIEW_USER;
-
-  const role = currentUser.role || 'RECEPTION';
+  const role: UserRole = user?.role || 'RECEPTION';
   const roleStyle = ROLE_BADGE_STYLE[role] || ROLE_BADGE_STYLE.RECEPTION;
-  const fullName = `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() || currentUser.email;
-  const initials = `${currentUser.firstName?.[0] || ''}${currentUser.lastName?.[0] || ''}`.toUpperCase() || 'U';
+  const fullName = user
+    ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email
+    : 'Clinical Staff';
+  const emailDisplay = user?.email || 'Not signed in';
+  const initials = user
+    ? `${user.firstName?.[0] || ''}${user.lastName?.[0] || ''}`.toUpperCase() || 'U'
+    : 'U';
 
   const handleSignOut = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out of RadAxis RIS?', [
@@ -91,7 +86,7 @@ export default function MoreScreen() {
             </View>
             <View style={styles.profileInfo}>
               <Text style={styles.userName}>{fullName}</Text>
-              <Text style={styles.userEmail}>{currentUser.email}</Text>
+              <Text style={styles.userEmail}>{emailDisplay}</Text>
               <View
                 style={[
                   styles.roleBadge,

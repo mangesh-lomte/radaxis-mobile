@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useInvoiceDetail, useInvoices } from '@/src/hooks/useBilling';
 import { billingService } from '@/src/services/billingService';
+import { isMutationAllowed, MUTATION_GUARD_MESSAGE } from '@/src/constants/environment';
 import {
   InvoiceDetail,
   InvoiceItem,
@@ -366,8 +367,8 @@ export default function StaffBillingScreen() {
                   </View>
                 </View>
 
-                {/* Collect Payment Action if Balance Due */}
-                {(activeDetail.balance ?? 0) > 0 && (
+                {/* Collect Payment Action if Balance Due (only when mutations allowed) */}
+                {(activeDetail.balance ?? 0) > 0 && isMutationAllowed() ? (
                   <TouchableOpacity
                     style={[
                       styles.viewReceiptBtn,
@@ -394,18 +395,15 @@ export default function StaffBillingScreen() {
                                   paymentMethod: 'UPI',
                                   reference: `UPI-MOB-${Date.now()}`,
                                 });
-                                Alert.alert(
-                                  res.isLocalDemonstration ? 'Preview Only' : 'Payment Recorded',
-                                  res.isLocalDemonstration
-                                    ? 'Preview only — no changes saved.'
-                                    : res.message,
-                                  [
-                                    {
-                                      text: 'View Receipt',
-                                      onPress: () => setActiveReceipt(res.receipt),
-                                    },
-                                  ]
-                                );
+                                if (!res.success || !res.receipt) {
+                                  Alert.alert('Read-Only Production View', res.message || MUTATION_GUARD_MESSAGE);
+                                  return;
+                                }
+                                refetch();
+                                const receipt = res.receipt;
+                                Alert.alert('Payment Recorded', res.message, [
+                                  { text: 'View Receipt', onPress: () => setActiveReceipt(receipt) },
+                                ]);
                               } catch (err: any) {
                                 Alert.alert('Payment Error', err?.message || 'Could not record payment.');
                               }
@@ -420,18 +418,15 @@ export default function StaffBillingScreen() {
                                   paymentMethod: 'CASH',
                                   reference: `CASH-MOB-${Date.now()}`,
                                 });
-                                Alert.alert(
-                                  res.isLocalDemonstration ? 'Preview Only' : 'Payment Recorded',
-                                  res.isLocalDemonstration
-                                    ? 'Preview only — no changes saved.'
-                                    : res.message,
-                                  [
-                                    {
-                                      text: 'View Receipt',
-                                      onPress: () => setActiveReceipt(res.receipt),
-                                    },
-                                  ]
-                                );
+                                if (!res.success || !res.receipt) {
+                                  Alert.alert('Read-Only Production View', res.message || MUTATION_GUARD_MESSAGE);
+                                  return;
+                                }
+                                refetch();
+                                const receipt = res.receipt;
+                                Alert.alert('Payment Recorded', res.message, [
+                                  { text: 'View Receipt', onPress: () => setActiveReceipt(receipt) },
+                                ]);
                               } catch (err: any) {
                                 Alert.alert('Payment Error', err?.message || 'Could not record payment.');
                               }
@@ -445,7 +440,11 @@ export default function StaffBillingScreen() {
                       + Collect Payment ({formatCurrency(activeDetail.balance)})
                     </Text>
                   </TouchableOpacity>
-                )}
+                ) : (activeDetail.balance ?? 0) > 0 ? (
+                  <Text style={{ fontSize: 12, color: '#64748B', marginTop: 10, fontStyle: 'italic' }}>
+                    Read-only view: Payment collection is performed at the RIS Billing Desk.
+                  </Text>
+                ) : null}
 
                 {/* Receipts Section */}
                 <Text style={styles.sectionHeaderTitle}>PAYMENT RECEIPTS</Text>

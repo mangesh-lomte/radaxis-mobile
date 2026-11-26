@@ -18,6 +18,8 @@ import { FilterChip } from '@/src/components/ui/FilterChip';
 import { AlertCard } from '@/src/components/ui/AlertCard';
 import { useCriticalFindings } from '@/src/hooks/useAlerts';
 import { alertsService } from '@/src/services/alertsService';
+import { useAuth } from '@/src/auth/AuthContext';
+import { isMutationAllowed, MUTATION_GUARD_MESSAGE } from '@/src/constants/environment';
 import { CriticalFindingItem } from '@/src/types/alerts';
 import { Colors } from '@/src/theme/colors';
 
@@ -26,6 +28,8 @@ type AlertFilter = 'ALL' | 'PENDING' | 'ESCALATED' | 'ACKNOWLEDGED';
 export default function AlertsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
+  const canMutate = isMutationAllowed();
 
   const [selectedFilter, setSelectedFilter] = useState<AlertFilter>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
@@ -118,6 +122,11 @@ export default function AlertsScreen() {
 
   // Action: Acknowledge Finding
   const handleAcknowledgePress = (finding: CriticalFindingItem) => {
+    if (!canMutate) {
+      Alert.alert('Read-Only Production View', MUTATION_GUARD_MESSAGE);
+      return;
+    }
+    const actorName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email : 'Clinician';
     Alert.alert(
       'Acknowledge Critical Finding',
       `Confirm receipt and clinical responsibility for:\n\n${
@@ -131,17 +140,18 @@ export default function AlertsScreen() {
             try {
               const res = await alertsService.acknowledgeFinding(
                 finding,
-                'Dr. Arthur Evans',
+                actorName,
                 'Verbal read-back confirmed via mobile triage acknowledgment.'
               );
+              if (!res.success) {
+                Alert.alert('Read-Only Production View', res.message);
+                return;
+              }
               refetch();
               if (selectedFinding?.id === finding.id) {
                 setSelectedFinding(res.finding);
               }
-              Alert.alert(
-                res.isLocalDemonstration ? 'Preview Only' : 'Finding Acknowledged',
-                res.isLocalDemonstration ? 'Preview only — no changes saved.' : res.message
-              );
+              Alert.alert('Finding Acknowledged', res.message);
             } catch (err: any) {
               Alert.alert('Acknowledgment Error', err?.message || 'Could not acknowledge finding.');
             }
@@ -153,6 +163,10 @@ export default function AlertsScreen() {
 
   // Action: Record Verbal Read-Back
   const handleReadBackPress = (finding: CriticalFindingItem) => {
+    if (!canMutate) {
+      Alert.alert('Read-Only Production View', MUTATION_GUARD_MESSAGE);
+      return;
+    }
     Alert.alert(
       'Record Verbal Read-Back',
       `Verify verbal communication and read-back confirmation with ${
@@ -169,14 +183,15 @@ export default function AlertsScreen() {
                 finding.recipient?.name || 'Ordering Clinician',
                 'Verbal read-back completed and verified accurately.'
               );
+              if (!res.success) {
+                Alert.alert('Read-Only Production View', res.message);
+                return;
+              }
               refetch();
               if (selectedFinding?.id === finding.id) {
                 setSelectedFinding(res.finding);
               }
-              Alert.alert(
-                res.isLocalDemonstration ? 'Preview Only' : 'Read-Back Logged',
-                res.isLocalDemonstration ? 'Preview only — no changes saved.' : res.message
-              );
+              Alert.alert('Read-Back Logged', res.message);
             } catch (err: any) {
               Alert.alert('Read-Back Error', err?.message || 'Could not record read-back.');
             }
@@ -188,6 +203,10 @@ export default function AlertsScreen() {
 
   // Action: Escalate Finding
   const handleEscalatePress = (finding: CriticalFindingItem) => {
+    if (!canMutate) {
+      Alert.alert('Read-Only Production View', MUTATION_GUARD_MESSAGE);
+      return;
+    }
     Alert.alert(
       'Escalate Critical Finding',
       `Escalate unacknowledged finding for ${
@@ -206,10 +225,7 @@ export default function AlertsScreen() {
             if (selectedFinding?.id === finding.id) {
               setSelectedFinding(updated);
             }
-            Alert.alert(
-              'Preview Only',
-              'Preview only — no changes saved.'
-            );
+            Alert.alert('Preview Only', 'Preview only — no changes saved.');
           },
         },
       ]
@@ -617,32 +633,34 @@ export default function AlertsScreen() {
                   </TouchableOpacity>
                 </View>
 
-                <View style={styles.modalDemoActionRow}>
-                  <TouchableOpacity
-                    style={[
-                      styles.modalAckButton,
-                      selectedFinding.status === 'ACKNOWLEDGED' &&
-                        styles.modalAckButtonDisabled,
-                    ]}
-                    disabled={selectedFinding.status === 'ACKNOWLEDGED'}
-                    onPress={() => handleAcknowledgePress(selectedFinding)}
-                  >
-                    <Text style={styles.modalAckButtonText}>
-                      {selectedFinding.status === 'ACKNOWLEDGED'
-                        ? 'Finding Acknowledged'
-                        : 'Confirm Verbal Read-Back & Acknowledge'}
-                    </Text>
-                  </TouchableOpacity>
+                {canMutate && (
+                  <View style={styles.modalDemoActionRow}>
+                    <TouchableOpacity
+                      style={[
+                        styles.modalAckButton,
+                        selectedFinding.status === 'ACKNOWLEDGED' &&
+                          styles.modalAckButtonDisabled,
+                      ]}
+                      disabled={selectedFinding.status === 'ACKNOWLEDGED'}
+                      onPress={() => handleAcknowledgePress(selectedFinding)}
+                    >
+                      <Text style={styles.modalAckButtonText}>
+                        {selectedFinding.status === 'ACKNOWLEDGED'
+                          ? 'Finding Acknowledged'
+                          : 'Confirm Verbal Read-Back & Acknowledge'}
+                      </Text>
+                    </TouchableOpacity>
 
-                  <TouchableOpacity
-                    style={styles.modalEscalateButton}
-                    onPress={() => handleEscalatePress(selectedFinding)}
-                  >
-                    <Text style={styles.modalEscalateButtonText}>
-                      Escalate Tier
-                    </Text>
-                  </TouchableOpacity>
-                </View>
+                    <TouchableOpacity
+                      style={styles.modalEscalateButton}
+                      onPress={() => handleEscalatePress(selectedFinding)}
+                    >
+                      <Text style={styles.modalEscalateButtonText}>
+                        Escalate Tier
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
             </View>
           </View>

@@ -264,11 +264,32 @@ export interface ImagingOrderStudy {
 
 export interface ImagingOrderReport {
   id: string;
-  reportStatus: string;
+  reportStatus?: string;
+  status?: string;
+  version?: number;
   findings?: string | null;
   impression?: string | null;
   isPreliminary?: boolean;
   finalizedAt?: string | null;
+  signedAt?: string | null;
+  isSigned?: boolean;
+  isLocked?: boolean;
+  signatureHash?: string | null;
+  pdfFileSizeBytes?: number | null;
+  pdfGeneratedAt?: string | null;
+  digitalSignature?: {
+    signedBy?: string;
+    statement?: string;
+    algorithm?: string;
+    signatureHash?: string;
+  } | null;
+  radiologist?: {
+    id?: string;
+    name?: string;
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+  } | null;
 }
 
 export interface ImagingOrderItem {

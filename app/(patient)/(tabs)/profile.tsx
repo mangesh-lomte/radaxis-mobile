@@ -136,7 +136,7 @@ export default function PatientProfileScreen() {
         </TouchableOpacity>
 
         <View style={styles.footerInfo}>
-          <Text style={styles.footerText}>RadAxis RIS Mobile • Patient Edition v1.0.0</Text>
+          <Text style={styles.footerText}>RadAxis RIS Mobile • Patient Edition v1.0.5</Text>
           <Text style={styles.footerSubText}>
             Connected to RIS Gateway
           </Text>

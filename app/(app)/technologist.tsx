@@ -20,6 +20,7 @@ import {
   useTechnologistWorklist,
 } from '@/src/hooks/useClinical';
 import { technologistService } from '@/src/services/clinicalService';
+import { isMutationAllowed, MUTATION_GUARD_MESSAGE } from '@/src/constants/environment';
 import { TechnologistWorklistItem } from '@/src/types/clinical';
 import { ModalityType, Priority } from '@/src/types';
 import { Colors } from '@/src/theme/colors';
@@ -110,9 +111,15 @@ export default function TechnologistScreen() {
     }
   };
 
+  const canMutate = isMutationAllowed();
+
   const handleSimulateAction = async (orderId: string, nextStage: string, actionName: string) => {
+    if (!canMutate) {
+      Alert.alert('Read-Only Production View', MUTATION_GUARD_MESSAGE);
+      return;
+    }
     try {
-      let res: { isLocalDemonstration: boolean; message: string };
+      let res: { success: boolean; isLocalDemonstration: boolean; message: string };
       if (nextStage === 'SCAN_IN_PROGRESS') {
         res = await technologistService.startScan(orderId);
       } else if (nextStage === 'SCAN_COMPLETED') {
@@ -120,19 +127,23 @@ export default function TechnologistScreen() {
       } else if (nextStage === 'IMAGE_ACCEPTED') {
         res = await technologistService.acceptImageQuality(orderId);
       } else {
-        res = { isLocalDemonstration: true, message: `Stage updated to ${nextStage}` };
+        res = { success: false, isLocalDemonstration: false, message: MUTATION_GUARD_MESSAGE };
+      }
+
+      if (!res.success) {
+        Alert.alert('Read-Only Production View', res.message);
+        return;
       }
 
       setSimulatedState((prev) => ({
         ...prev,
         [orderId]: { stage: nextStage, simulated: res.isLocalDemonstration },
       }));
+      refetch();
 
       Alert.alert(
-        res.isLocalDemonstration ? 'Preview Only' : 'Action Confirmed',
-        res.isLocalDemonstration
-          ? 'Preview only — no changes saved.'
-          : `Order status transitioned to "${nextStage}". Note: Physical image acquisition and transfer occur on the modality console.`,
+        'Action Confirmed',
+        `Order status transitioned to "${nextStage}". Note: Physical image acquisition and transfer occur on the modality console.`,
         [{ text: 'OK' }]
       );
     } catch (err: any) {
@@ -580,36 +591,47 @@ export default function TechnologistScreen() {
                         </View>
                       </View>
 
-                      {/* Simulation Action Buttons */}
-                      <TouchableOpacity
-                        style={styles.actionBtnBlue}
-                        onPress={() =>
-                          handleSimulateAction(selectedItem.orderId, 'SCAN_IN_PROGRESS', 'Start Acquisition')
-                        }
-                        activeOpacity={0.8}
-                      >
-                        <Text style={styles.actionBtnText}>1. Update Order Status: Scan In Progress →</Text>
-                      </TouchableOpacity>
+                      {/* Workflow Transition Actions (only enabled when environment allows mutations) */}
+                      {canMutate ? (
+                        <>
+                          <TouchableOpacity
+                            style={styles.actionBtnBlue}
+                            onPress={() =>
+                              handleSimulateAction(selectedItem.orderId, 'SCAN_IN_PROGRESS', 'Start Acquisition')
+                            }
+                            activeOpacity={0.8}
+                          >
+                            <Text style={styles.actionBtnText}>1. Update Order Status: Scan In Progress →</Text>
+                          </TouchableOpacity>
 
-                      <TouchableOpacity
-                        style={styles.actionBtnGreen}
-                        onPress={() =>
-                          handleSimulateAction(selectedItem.orderId, 'SCAN_COMPLETED', 'Finish Acquisition')
-                        }
-                        activeOpacity={0.8}
-                      >
-                        <Text style={styles.actionBtnText}>2. Record Acquisition Complete & Review QA →</Text>
-                      </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.actionBtnGreen}
+                            onPress={() =>
+                              handleSimulateAction(selectedItem.orderId, 'SCAN_COMPLETED', 'Finish Acquisition')
+                            }
+                            activeOpacity={0.8}
+                          >
+                            <Text style={styles.actionBtnText}>2. Record Acquisition Complete & Review QA →</Text>
+                          </TouchableOpacity>
 
-                      <TouchableOpacity
-                        style={styles.actionBtnDark}
-                        onPress={() =>
-                          handleSimulateAction(selectedItem.orderId, 'IMAGE_ACCEPTED', 'Accept QA & Sync')
-                        }
-                        activeOpacity={0.8}
-                      >
-                        <Text style={styles.actionBtnText}>3. Accept Image QA & Update PACS Status →</Text>
-                      </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.actionBtnDark}
+                            onPress={() =>
+                              handleSimulateAction(selectedItem.orderId, 'IMAGE_ACCEPTED', 'Accept QA & Sync')
+                            }
+                            activeOpacity={0.8}
+                          >
+                            <Text style={styles.actionBtnText}>3. Accept Image QA & Update PACS Status →</Text>
+                          </TouchableOpacity>
+                        </>
+                      ) : (
+                        <View style={styles.simNoticeBox}>
+                          <Text style={styles.simNoticeTitle}>READ-ONLY PRODUCTION VIEW</Text>
+                          <Text style={styles.simNoticeText}>
+                            Scan acquisition and image QA transitions must be executed from the modality console / RIS Web Workstation.
+                          </Text>
+                        </View>
+                      )}
                     </View>
                   </View>
                 )}

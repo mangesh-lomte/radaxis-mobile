@@ -5,7 +5,7 @@
  */
 
 import { apiClient } from './api';
-import { isMutationAllowed } from '../constants/environment';
+import { isMutationAllowed, MUTATION_GUARD_MESSAGE } from '../constants/environment';
 import {
   FinalizedReportSummary,
   PreparationData,
@@ -72,9 +72,9 @@ export const technologistService = {
   ): Promise<{ success: boolean; isLocalDemonstration: boolean; message: string }> => {
     if (!isMutationAllowed()) {
       return {
-        success: true,
-        isLocalDemonstration: true,
-        message: 'Preview only — no changes saved.',
+        success: false,
+        isLocalDemonstration: false,
+        message: MUTATION_GUARD_MESSAGE,
       };
     }
 
@@ -119,9 +119,9 @@ export const technologistService = {
   ): Promise<{ success: boolean; isLocalDemonstration: boolean; message: string }> => {
     if (!isMutationAllowed()) {
       return {
-        success: true,
-        isLocalDemonstration: true,
-        message: 'Preview only — no changes saved.',
+        success: false,
+        isLocalDemonstration: false,
+        message: MUTATION_GUARD_MESSAGE,
       };
     }
     const endpoint = `/technologist/worklist/${encodeURIComponent(orderId.trim())}/scan/start`;
@@ -141,9 +141,9 @@ export const technologistService = {
   ): Promise<{ success: boolean; isLocalDemonstration: boolean; message: string }> => {
     if (!isMutationAllowed()) {
       return {
-        success: true,
-        isLocalDemonstration: true,
-        message: 'Preview only — no changes saved.',
+        success: false,
+        isLocalDemonstration: false,
+        message: MUTATION_GUARD_MESSAGE,
       };
     }
     const endpoint = `/technologist/worklist/${encodeURIComponent(orderId.trim())}/scan/finish`;
@@ -163,9 +163,9 @@ export const technologistService = {
   ): Promise<{ success: boolean; isLocalDemonstration: boolean; message: string }> => {
     if (!isMutationAllowed()) {
       return {
-        success: true,
-        isLocalDemonstration: true,
-        message: 'Preview only — no changes saved.',
+        success: false,
+        isLocalDemonstration: false,
+        message: MUTATION_GUARD_MESSAGE,
       };
     }
     // Ensure image QA review is started before accepting
@@ -201,8 +201,8 @@ export const radiologistService = {
 
     const qs = query.toString();
     const endpoint = `/radiologist/worklist${qs ? `?${qs}` : ''}`;
-    const res = await apiClient<RadiologistWorklistItem[]>(endpoint);
-    return Array.isArray(res.data) ? res.data : [];
+    const res = await apiClient<RadiologistWorklistItem[] | { items: RadiologistWorklistItem[] }>(endpoint);
+    return Array.isArray(res.data) ? res.data : res.data?.items || [];
   },
 
   /**
@@ -224,61 +224,17 @@ export const radiologistService = {
   },
 
   /**
-   * Retrieve standard structured reporting templates
-   * Falls back to default templates if user role lacks admin RBAC
+   * Retrieve reporting templates from backend catalog (ADMIN-scoped endpoint).
+   * Returns empty list when unauthorized or unconfigured — never injects synthetic templates.
    */
   getReportingTemplates: async (): Promise<ReportingTemplateItem[]> => {
     try {
       const endpoint = '/admin/reporting-templates';
       const res = await apiClient<ReportingTemplateItem[]>(endpoint);
-      if (res.data && res.data.length > 0) {
-        return res.data;
-      }
+      return Array.isArray(res.data) ? res.data : [];
     } catch (_err) {
-      // Gracefully handle RBAC or network restrictions with standard clinical templates
+      return [];
     }
-    return [
-      {
-        id: 'tpl-ct-abd',
-        name: 'CT Abdomen / Pelvis Template',
-        modality: 'CT',
-        bodyPart: 'Abdomen',
-        description: 'Standard structured reporting template for abdominal/pelvic computed tomography',
-        language: 'en',
-        sections: ['TECHNIQUE', 'COMPARISON', 'FINDINGS', 'IMPRESSION'],
-        isActive: true,
-      },
-      {
-        id: 'tpl-xr-chest',
-        name: 'Standard Chest Radiograph',
-        modality: 'XRAY',
-        bodyPart: 'Chest',
-        description: 'Routine chest radiograph PA/Lateral structured evaluation',
-        language: 'en',
-        sections: ['CLINICAL INDICATION', 'FINDINGS', 'IMPRESSION'],
-        isActive: true,
-      },
-      {
-        id: 'tpl-mr-brain',
-        name: 'MRI Brain Routine Protocol',
-        modality: 'MRI',
-        bodyPart: 'Head',
-        description: 'Multi-sequence diagnostic magnetic resonance imaging protocol for brain parenchyma',
-        language: 'en',
-        sections: ['TECHNIQUE', 'DIFFUSION', 'PARENCHYMA', 'VENTRICLES', 'IMPRESSION'],
-        isActive: true,
-      },
-      {
-        id: 'tpl-us-abd',
-        name: 'Ultrasound Upper Abdomen',
-        modality: 'ULTRASOUND',
-        bodyPart: 'Abdomen',
-        description: 'Liver, gallbladder, biliary tree, spleen, pancreas and renal ultrasound',
-        language: 'en',
-        sections: ['FINDINGS', 'HEPATOBILIARY', 'RENAL', 'IMPRESSION'],
-        isActive: true,
-      },
-    ];
   },
 
   /**
@@ -298,9 +254,9 @@ export const radiologistService = {
   ): Promise<{ success: boolean; isLocalDemonstration: boolean; message: string }> => {
     if (!isMutationAllowed()) {
       return {
-        success: true,
-        isLocalDemonstration: true,
-        message: 'Preview only — no changes saved.',
+        success: false,
+        isLocalDemonstration: false,
+        message: MUTATION_GUARD_MESSAGE,
       };
     }
     const endpoint = `/radiologist/worklist/${encodeURIComponent(orderId.trim())}/claim`;
@@ -320,9 +276,9 @@ export const radiologistService = {
   ): Promise<{ success: boolean; isLocalDemonstration: boolean; message: string }> => {
     if (!isMutationAllowed()) {
       return {
-        success: true,
-        isLocalDemonstration: true,
-        message: 'Preview only — no changes saved.',
+        success: false,
+        isLocalDemonstration: false,
+        message: MUTATION_GUARD_MESSAGE,
       };
     }
     const endpoint = `/radiologist/worklist/${encodeURIComponent(orderId.trim())}/release`;
@@ -343,9 +299,9 @@ export const radiologistService = {
   ): Promise<{ success: boolean; isLocalDemonstration: boolean; message: string }> => {
     if (!isMutationAllowed()) {
       return {
-        success: true,
-        isLocalDemonstration: true,
-        message: 'Preview only — no changes saved.',
+        success: false,
+        isLocalDemonstration: false,
+        message: MUTATION_GUARD_MESSAGE,
       };
     }
     const endpoint = `/radiologist/worklist/${encodeURIComponent(orderId.trim())}/report/draft`;
@@ -375,9 +331,9 @@ export const radiologistService = {
   ): Promise<{ success: boolean; isLocalDemonstration: boolean; message: string }> => {
     if (!isMutationAllowed()) {
       return {
-        success: true,
-        isLocalDemonstration: true,
-        message: 'Preview only — no changes saved.',
+        success: false,
+        isLocalDemonstration: false,
+        message: MUTATION_GUARD_MESSAGE,
       };
     }
     const endpoint = `/radiologist/worklist/${encodeURIComponent(reportOrOrderId.trim())}/report/finalize`;
