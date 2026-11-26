@@ -1,0 +1,61 @@
+# Dependencies
+node_modules
+node_modules/
+
+# Staging Environment & Database Isolation (NEVER UPLOAD TO EAS)
+.staging
+.staging/**
+staging_pg
+staging_pg/**
+ris-backend
+ris-backend/**
+archive-inspect
+archive-inspect/**
+*.sql
+*.dump
+*.sqlite
+*.db
+
+# Test suites & Local Verification Artifacts
+__tests__
+__tests__/**
+coverage
+coverage/**
+.system_generated
+.system_generated/**
+*.log
+
+# Expo & Metro Build Artifacts
+.expo
+.expo/**
+dist
+dist/**
+web-build
+web-build/**
+expo-env.d.ts
+.metro-health-check*
+
+# Native Keystores, Certificates & Secrets
+.kotlin
+.kotlin/**
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.pem
+*.mobileprovision
+.DS_Store
+
+# Environment & Local Secrets
+.env
+.env*
+.env*.local
+.env.staging
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Prebuild native folders
+ios
+android

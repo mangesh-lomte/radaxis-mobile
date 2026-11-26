@@ -1,0 +1,58 @@
+{
+  "cli": {
+    "version": ">= 12.0.0"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://meril-ris.mangesh.my.id/api/v1",
+        "EXPO_PUBLIC_APP_ENV": "production",
+        "EXPO_PUBLIC_DEV_PREVIEW_MODE": "false"
+      }
+    },
+    "preview-video": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "http://192.168.43.204:5005/api/v1",
+        "EXPO_PUBLIC_APP_ENV": "staging",
+        "EXPO_PUBLIC_APP_VARIANT": "video",
+        "EXPO_PUBLIC_DEV_PREVIEW_MODE": "false"
+      }
+    },
+    "preview-staging": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "http://192.168.43.204:5005/api/v1",
+        "EXPO_PUBLIC_APP_ENV": "staging",
+        "EXPO_PUBLIC_DEV_PREVIEW_MODE": "false"
+      }
+    },
+    "production": {
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://meril-ris.mangesh.my.id/api/v1",
+        "EXPO_PUBLIC_APP_ENV": "production",
+        "EXPO_PUBLIC_DEV_PREVIEW_MODE": "false"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

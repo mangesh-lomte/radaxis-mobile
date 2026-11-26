@@ -1,0 +1,54 @@
+# Dependencies
+node_modules/
+
+# Expo & Metro
+.expo/
+dist/
+web-build/
+.metro-health-check*
+expo-env.d.ts
+
+# Native builds, signing keystores & certificates
+*.orig.*
+*.jks
+*.keystore
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.pem
+*.crt
+credentials.json
+google-services.json
+GoogleService-Info.plist
+
+# Operating system files
+.DS_Store
+Thumbs.db
+
+# Local environment files (NEVER commit secrets)
+.env
+.env*.local
+.env.production
+.env.staging
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Generated native folders
+/ios
+/android
+
+# Staging backend, local database & internal development scratch
+.staging/
+.backup_recovery/
+archive-inspect/
+scratch/
+
+# IDE configurations
+.vscode/
+.idea/
+
+# Android build outputs & binaries
+*.apk
+*.aab
